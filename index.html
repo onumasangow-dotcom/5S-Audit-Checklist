@@ -536,6 +536,42 @@ ZONES.forEach(z=>{
 
 let openZones = {};
 
+// ---------- storage adapter ----------
+// This file is meant to be opened directly as a standalone HTML file (double-click
+// or served from a file/webserver). In that context `window.storage` (the Claude
+// artifact key-value store) does not exist, so calling it directly throws and the
+// Save button silently fails. This adapter uses window.storage when available
+// (e.g. running inside a Claude artifact) and falls back to the browser's
+// localStorage otherwise, so saving works in both environments.
+const storageAdapter = {
+  async get(key, shared){
+    if (window.storage) return window.storage.get(key, shared);
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) throw new Error('key not found: ' + key);
+    return { key, value: raw, shared: !!shared };
+  },
+  async set(key, value, shared){
+    if (window.storage) return window.storage.set(key, value, shared);
+    window.localStorage.setItem(key, value);
+    return { key, value, shared: !!shared };
+  },
+  async delete(key, shared){
+    if (window.storage) return window.storage.delete(key, shared);
+    window.localStorage.removeItem(key);
+    return { key, deleted: true, shared: !!shared };
+  },
+  async list(prefix, shared){
+    if (window.storage) return window.storage.list(prefix, shared);
+    const p = prefix || '';
+    const keys = [];
+    for (let i = 0; i < window.localStorage.length; i++){
+      const k = window.localStorage.key(i);
+      if (k && k.indexOf(p) === 0) keys.push(k);
+    }
+    return { keys, prefix: p, shared: !!shared };
+  }
+};
+
 function scoreColor(s){
   return s===1?"var(--s1)":s===2?"var(--s2)":s===3?"var(--s3)":s===4?"var(--s4)":"var(--line)";
 }
@@ -691,7 +727,7 @@ async function saveReport(){
     savedAt: new Date().toISOString()
   };
   try{
-    const res = await window.storage.set(report.id, JSON.stringify(report), false);
+    const res = await storageAdapter.set(report.id, JSON.stringify(report), false);
     if(res){
       showToast('บันทึกผลการตรวจเรียบร้อยแล้ว');
     } else {
@@ -704,12 +740,12 @@ async function saveReport(){
 }
 
 async function fetchAllReports(){
-  const idx = await window.storage.list('report:', false);
+  const idx = await storageAdapter.list('report:', false);
   const keys = (idx && idx.keys) ? idx.keys : [];
   const reports = [];
   for(const k of keys){
     try{
-      const r = await window.storage.get(k, false);
+      const r = await storageAdapter.get(k, false);
       if(r && r.value) reports.push(JSON.parse(r.value));
     }catch(e){ /* skip missing */ }
   }
