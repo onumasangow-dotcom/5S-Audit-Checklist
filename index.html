@@ -1,9 +1,3 @@
-function openDrawer(){
-  document.getElementById('drawer').classList.add('open');
-  document.getElementById('drawerBackdrop').classList.add('open');
-  loadHistory();
-}
-function closeDrawer(){
   document.getElementById('drawer').classList.remove('open');
   document.getElementById('drawerBackdrop').classList.remove('open');
 }
@@ -30,10 +24,12 @@ document.getElementById('btnReset').addEventListener('click', async ()=>{
 });
 
 document.getElementById('inspectorName').addEventListener('input', scheduleDraftSave);
+document.getElementById('inspectorName').addEventListener('blur', handleInspectorChange);
 document.getElementById('inspectDate').addEventListener('change', handleDateChange);
 
 document.getElementById('inspectDate').value = new Date().toISOString().slice(0,10);
 lastInspectDate = document.getElementById('inspectDate').value;
+lastInspectorName = document.getElementById('inspectorName').value.trim();
 
 // ---------- ประวัติ: ปุ่มกลับ / แท็บ / ยกเลิกโหมดแก้ไข / เลือกเดือน ----------
 document.getElementById('histBack').addEventListener('click', renderHistoryDateList);
@@ -53,7 +49,8 @@ renderLegend();
 
 // ก่อนแสดงฟอร์ม: เช็คก่อนว่ามีร่างที่กรอกค้างไว้ของวันนี้ (ตามค่าวันที่เริ่มต้น) หรือไม่ ถ้ามีให้โหลดกลับเข้าฟอร์มก่อนค่อย render
 (async function init(){
-  await restoreDraftForDate(lastInspectDate);
+  await purgeExpiredDrafts(); // เก็บกวาดร่างเก่าที่ค้างไว้เกิน 1 วันทิ้งไปก่อน ไม่ให้ข้อมูลเก่าค้างอยู่ในเครื่อง
+  await restoreDraftForDate(lastInspectDate, lastInspectorName); // ตอนนี้ชื่อยังว่าง จะโหลดได้ก็ต่อเมื่อเคยกรอกค้างไว้แบบไม่ระบุชื่อ
   renderZones();
   renderDashboard();
   syncPendingReports();
